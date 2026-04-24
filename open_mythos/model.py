@@ -210,12 +210,12 @@ class OpenMythos(nn.Module):
     def _init_weights(self, module: nn.Module) -> None:
         """Initialise weights with standard deviation scaled by dim."""
         if isinstance(module, nn.Linear):
-            std = 0.02
+            std = self.cfg.init_std
             nn.init.normal_(module.weight, mean=0.0, std=std)
             if module.bias is not None:
                 nn.init.zeros_(module.bias)
         elif isinstance(module, nn.Embedding):
-            nn.init.normal_(module.weight, mean=0.0, std=0.02)
+            nn.init.normal_(module.weight, mean=0.0, std=self.cfg.init_std)
 
     def forward(
         self,

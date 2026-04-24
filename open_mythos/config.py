@@ -55,6 +55,7 @@ class MythosConfig:
     dropout: float = 0.0
     norm_eps: float = 1e-6
     rope_theta: float = 10_000.0
+    init_std: float = 0.02
 
     # ── MoE Auxiliary Loss ───────────────────────────────────────────────
     moe_aux_loss_weight: float = 0.01
