@@ -289,6 +289,7 @@ class OpenMythos(nn.Module):
         temperature: float = 1.0,
         top_k: int = 50,
         top_p: float = 0.9,
+        min_p: float = 0.0,
         repetition_penalty: float = 1.0,
     ) -> torch.Tensor:
         """Autoregressive token generation.
@@ -317,6 +318,13 @@ class OpenMythos(nn.Module):
                 score = torch.gather(logits, 1, input_ids)
                 score = torch.where(score < 0, score * repetition_penalty, score / repetition_penalty)
                 logits.scatter_(1, input_ids, score)
+
+            # ── Min-p filtering ──────────────────────────────────────────
+            if min_p > 0.0:
+                probs = F.softmax(logits, dim=-1)
+                max_probs = probs.max(dim=-1, keepdim=True).values
+                indices_to_remove = probs < (min_p * max_probs)
+                logits = logits.masked_fill(indices_to_remove, float("-inf"))
 
             # ── Top-k filtering ──────────────────────────────────────────
             if top_k > 0:
