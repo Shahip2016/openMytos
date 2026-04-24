@@ -353,6 +353,56 @@ class OpenMythos(nn.Module):
 
         return input_ids
 
+    @torch.no_grad()
+    def generate_stream(
+        self,
+        input_ids: torch.Tensor,
+        max_new_tokens: int = 128,
+        temperature: float = 1.0,
+        top_k: int = 50,
+        top_p: float = 0.9,
+        min_p: float = 0.0,
+        repetition_penalty: float = 1.0,
+    ):
+        """Autoregressive token generation yielding tokens sequentially."""
+        self.eval()
+        for _ in range(max_new_tokens):
+            idx_cond = input_ids[:, -self.cfg.max_seq_len:]
+            output = self.forward(idx_cond)
+            logits = output.logits[:, -1, :] / max(temperature, 1e-8)
+
+            if repetition_penalty != 1.0:
+                score = torch.gather(logits, 1, input_ids)
+                score = torch.where(score < 0, score * repetition_penalty, score / repetition_penalty)
+                logits.scatter_(1, input_ids, score)
+
+            if min_p > 0.0:
+                probs = F.softmax(logits, dim=-1)
+                max_probs = probs.max(dim=-1, keepdim=True).values
+                indices_to_remove = probs < (min_p * max_probs)
+                logits = logits.masked_fill(indices_to_remove, float("-inf"))
+
+            if top_k > 0:
+                top_k_val = min(top_k, logits.size(-1))
+                kth_val = torch.topk(logits, top_k_val, dim=-1).values[:, -1:]
+                logits = logits.masked_fill(logits < kth_val, float("-inf"))
+
+            if top_p < 1.0:
+                sorted_logits, sorted_indices = torch.sort(logits, descending=True)
+                cum_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
+                sorted_indices_to_remove = cum_probs > top_p
+                sorted_indices_to_remove[:, 1:] = sorted_indices_to_remove[:, :-1].clone()
+                sorted_indices_to_remove[:, 0] = False
+                indices_to_remove = sorted_indices_to_remove.scatter(
+                    1, sorted_indices, sorted_indices_to_remove
+                )
+                logits = logits.masked_fill(indices_to_remove, float("-inf"))
+
+            probs = F.softmax(logits, dim=-1)
+            next_token = torch.multinomial(probs, num_samples=1)
+            yield next_token
+            input_ids = torch.cat([input_ids, next_token], dim=1)
+
     def count_parameters(self) -> dict[str, int]:
         """Count parameters by component."""
         def _count(module: nn.Module) -> int:
