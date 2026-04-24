@@ -21,6 +21,7 @@ class MythosConfig:
     vocab_size: int = 32_000
     dim: int = 2048
     max_seq_len: int = 4096
+    tie_word_embeddings: bool = True
 
     # ── Structural Depth ─────────────────────────────────────────────────
     prelude_layers: int = 4

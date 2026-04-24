@@ -186,8 +186,9 @@ class OpenMythos(nn.Module):
         self.final_norm = RMSNorm(cfg.dim, cfg.norm_eps)
         self.lm_head = nn.Linear(cfg.dim, cfg.vocab_size, bias=False)
 
-        # Weight tying: LM head shares weights with token embedding
-        self.lm_head.weight = self.tok_emb.weight
+        # Weight tying: LM head optionally shares weights with token embedding
+        if cfg.tie_word_embeddings:
+            self.lm_head.weight = self.tok_emb.weight
 
         # ── Adaptive Computation Time (optional) ─────────────────────────
         self.act: Optional[AdaptiveComputationTime] = None
