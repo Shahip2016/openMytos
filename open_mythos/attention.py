@@ -111,22 +111,12 @@ class MultiLatentAttention(nn.Module):
         k_full = k_full.transpose(1, 2)
         v = v.transpose(1, 2)            # (B, H, T, v_head_dim)
 
-        # Manual scaled dot-product since Q·K dim != V dim
-        scale = 1.0 / math.sqrt(self.qk_head_dim)
-        scores = torch.matmul(q_full, k_full.transpose(-2, -1)) * scale
-
-        if mask is not None:
-            scores = scores + mask
-        else:
-            # Causal mask
-            causal = torch.triu(
-                torch.full((T, T), float("-inf"), device=x.device, dtype=scores.dtype),
-                diagonal=1,
-            )
-            scores = scores + causal[None, None, :, :]
-
-        attn_weights = F.softmax(scores, dim=-1)
-        out = torch.matmul(attn_weights, v)  # (B, H, T, v_head_dim)
+        out = F.scaled_dot_product_attention(
+            q_full, k_full, v,
+            attn_mask=mask,
+            is_causal=(mask is None),
+            scale=1.0 / math.sqrt(self.qk_head_dim)
+        )
 
         out = out.transpose(1, 2).contiguous().view(B, T, -1)
         return self.dropout(self.wo(out))
