@@ -403,6 +403,34 @@ class OpenMythos(nn.Module):
             yield next_token
             input_ids = torch.cat([input_ids, next_token], dim=1)
 
+    @torch.no_grad()
+    def calculate_perplexity(
+        self,
+        input_ids: torch.Tensor,
+        labels: Optional[torch.Tensor] = None,
+    ) -> float:
+        """Calculate perplexity of the model on the given input_ids.
+        
+        If labels is None, input_ids are used as labels (shifted internally).
+        """
+        self.eval()
+        if labels is None:
+            labels = input_ids
+
+        output = self.forward(input_ids)
+        logits = output.logits
+        
+        # Shift logits and labels for next token prediction
+        shift_logits = logits[..., :-1, :].contiguous()
+        shift_labels = labels[..., 1:].contiguous()
+        
+        loss = F.cross_entropy(
+            shift_logits.view(-1, shift_logits.size(-1)),
+            shift_labels.view(-1)
+        )
+        
+        return math.exp(loss.item())
+
     def count_parameters(self) -> dict[str, int]:
         """Count parameters by component."""
         def _count(module: nn.Module) -> int:
