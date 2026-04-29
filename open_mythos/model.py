@@ -201,7 +201,7 @@ class OpenMythos(nn.Module):
         rope_dim = max(cfg.dim // cfg.n_heads, cfg.qk_head_dim)
         self.register_buffer(
             "rope_freqs",
-            precompute_rope_frequencies(rope_dim, cfg.max_seq_len, cfg.rope_theta),
+            precompute_rope_frequencies(rope_dim, cfg.max_seq_len, cfg.rope_theta, cfg.rope_scaling_factor),
             persistent=False,
         )
 

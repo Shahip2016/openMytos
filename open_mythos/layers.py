@@ -57,11 +57,12 @@ def precompute_rope_frequencies(
     dim: int,
     max_seq_len: int,
     theta: float = 10_000.0,
+    scaling_factor: float = 1.0,
     device: Optional[torch.device] = None,
 ) -> torch.Tensor:
     """Precompute complex-valued RoPE frequency tensor of shape (max_seq_len, dim//2)."""
     freqs = 1.0 / (theta ** (torch.arange(0, dim, 2, device=device).float() / dim))
-    t = torch.arange(max_seq_len, device=device).float()
+    t = torch.arange(max_seq_len, device=device).float() / scaling_factor
     angles = torch.outer(t, freqs)  # (seq_len, dim//2)
     return torch.polar(torch.ones_like(angles), angles)  # complex64
 
