@@ -72,7 +72,8 @@ class MultiLatentAttention(nn.Module):
 
         # ── Output projection ───────────────────────────────────────────
         self.wo = nn.Linear(cfg.n_heads * cfg.v_head_dim, cfg.dim, bias=False)
-        self.dropout = nn.Dropout(cfg.dropout) if cfg.dropout > 0 else nn.Identity()
+        self.attn_dropout_p = cfg.attn_dropout
+        self.resid_dropout = nn.Dropout(cfg.resid_dropout) if cfg.resid_dropout > 0 else nn.Identity()
 
     def forward(
         self,
@@ -114,12 +115,13 @@ class MultiLatentAttention(nn.Module):
         out = F.scaled_dot_product_attention(
             q_full, k_full, v,
             attn_mask=mask,
+            dropout_p=self.attn_dropout_p if self.training else 0.0,
             is_causal=(mask is None),
             scale=1.0 / math.sqrt(self.qk_head_dim)
         )
 
         out = out.transpose(1, 2).contiguous().view(B, T, -1)
-        return self.dropout(self.wo(out))
+        return self.resid_dropout(self.wo(out))
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -140,7 +142,8 @@ class GroupedQueryAttention(nn.Module):
         self.wk = nn.Linear(cfg.dim, cfg.n_kv_heads * self.head_dim, bias=False)
         self.wv = nn.Linear(cfg.dim, cfg.n_kv_heads * self.head_dim, bias=False)
         self.wo = nn.Linear(cfg.n_heads * self.head_dim, cfg.dim, bias=False)
-        self.dropout = nn.Dropout(cfg.dropout) if cfg.dropout > 0 else nn.Identity()
+        self.attn_dropout_p = cfg.attn_dropout
+        self.resid_dropout = nn.Dropout(cfg.resid_dropout) if cfg.resid_dropout > 0 else nn.Identity()
 
     def forward(
         self,
@@ -170,6 +173,8 @@ class GroupedQueryAttention(nn.Module):
         k = k.transpose(1, 2)
         v = v.transpose(1, 2)
 
-        out = F.scaled_dot_product_attention(q, k, v, attn_mask=mask, is_causal=(mask is None))
+        out = F.scaled_dot_product_attention(
+            q, k, v, attn_mask=mask, dropout_p=self.attn_dropout_p if self.training else 0.0, is_causal=(mask is None)
+        )
         out = out.transpose(1, 2).contiguous().view(B, T, -1)
-        return self.dropout(self.wo(out))
+        return self.resid_dropout(self.wo(out))

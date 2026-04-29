@@ -110,7 +110,8 @@ class TransformerBlock(nn.Module):
         self.wk = nn.Linear(cfg.dim, n_kv * head_dim, bias=False)
         self.wv = nn.Linear(cfg.dim, n_kv * head_dim, bias=False)
         self.wo = nn.Linear(cfg.n_heads * head_dim, cfg.dim, bias=False)
-        self.attn_dropout = nn.Dropout(cfg.dropout) if cfg.dropout > 0 else nn.Identity()
+        self.attn_dropout_p = cfg.attn_dropout
+        self.resid_dropout = nn.Dropout(cfg.resid_dropout) if cfg.resid_dropout > 0 else nn.Identity()
 
         self.n_heads = cfg.n_heads
         self.n_kv_heads = n_kv
@@ -121,7 +122,7 @@ class TransformerBlock(nn.Module):
         ffn_hidden = int(cfg.dim * 8 / 3)  # standard SwiGLU sizing
         # Round up to nearest multiple of 64 for efficiency
         ffn_hidden = ((ffn_hidden + 63) // 64) * 64
-        self.ffn = SwiGLU(cfg.dim, ffn_hidden, cfg.dropout)
+        self.ffn = SwiGLU(cfg.dim, ffn_hidden, cfg.resid_dropout)
 
     def forward(
         self,
@@ -154,9 +155,11 @@ class TransformerBlock(nn.Module):
         v = v.transpose(1, 2)
 
         # Scaled dot-product attention
-        attn = F.scaled_dot_product_attention(q, k, v, attn_mask=mask, is_causal=(mask is None))
+        attn = F.scaled_dot_product_attention(
+            q, k, v, attn_mask=mask, dropout_p=self.attn_dropout_p if self.training else 0.0, is_causal=(mask is None)
+        )
         attn = attn.transpose(1, 2).contiguous().view(B, T, -1)
-        attn = self.attn_dropout(self.wo(attn))
+        attn = self.resid_dropout(self.wo(attn))
 
         x = x + attn
 
