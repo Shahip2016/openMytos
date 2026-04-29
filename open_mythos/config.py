@@ -27,6 +27,7 @@ class MythosConfig:
     prelude_layers: int = 4
     coda_layers: int = 4
     max_loop_iters: int = 8
+    use_checkpointing: bool = False
 
     # ── Attention ────────────────────────────────────────────────────────
     attn_type: Literal["mla", "gqa"] = "mla"

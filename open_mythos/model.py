@@ -21,6 +21,7 @@ from typing import Optional, Tuple
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.utils.checkpoint as checkpoint
 
 from open_mythos.config import MythosConfig
 from open_mythos.layers import (
@@ -241,7 +242,10 @@ class OpenMythos(nn.Module):
 
         # ── Prelude ──────────────────────────────────────────────────────
         for block in self.prelude:
-            x = block(x, self.rope_freqs, mask)
+            if self.cfg.use_checkpointing and self.training:
+                x = checkpoint.checkpoint(block, x, self.rope_freqs, mask, use_reentrant=False)
+            else:
+                x = block(x, self.rope_freqs, mask)
 
         # Save encoded input for LTI re-injection
         z0 = x
@@ -252,7 +256,12 @@ class OpenMythos(nn.Module):
         intermediate_states: list[torch.Tensor] = []
 
         for step in range(self.cfg.max_loop_iters):
-            h, aux_loss = self.recurrent_block(h, z0, self.rope_freqs, step, mask)
+            if self.cfg.use_checkpointing and self.training:
+                h, aux_loss = checkpoint.checkpoint(
+                    self.recurrent_block, h, z0, self.rope_freqs, step, mask, use_reentrant=False
+                )
+            else:
+                h, aux_loss = self.recurrent_block(h, z0, self.rope_freqs, step, mask)
             total_aux_loss = total_aux_loss + aux_loss
             if self.act is not None:
                 intermediate_states.append(h)
@@ -269,7 +278,10 @@ class OpenMythos(nn.Module):
         # ── Coda ─────────────────────────────────────────────────────────
         x = h
         for block in self.coda:
-            x = block(x, self.rope_freqs, mask)
+            if self.cfg.use_checkpointing and self.training:
+                x = checkpoint.checkpoint(block, x, self.rope_freqs, mask, use_reentrant=False)
+            else:
+                x = block(x, self.rope_freqs, mask)
 
         # ── Output ───────────────────────────────────────────────────────
         x = self.final_norm(x)
