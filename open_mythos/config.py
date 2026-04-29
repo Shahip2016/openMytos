@@ -40,6 +40,7 @@ class MythosConfig:
     qk_head_dim: int = 64
     v_head_dim: int = 64
     qk_rope_dim: int = 32  # portion of qk_head_dim that receives RoPE
+    sliding_window: Optional[int] = None
 
     # ── Mixture-of-Experts ───────────────────────────────────────────────
     n_experts: int = 8

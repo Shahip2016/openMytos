@@ -235,6 +235,18 @@ class OpenMythos(nn.Module):
         B, T = input_ids.shape
         device = input_ids.device
 
+        # Determine attention mask
+        if mask is None:
+            if self.cfg.sliding_window is not None:
+                # Causal sliding window mask
+                mask = torch.ones(T, T, dtype=torch.bool, device=device)
+                mask = torch.tril(mask) & torch.triu(mask, diagonal=-self.cfg.sliding_window + 1)
+                # Convert to attention mask format
+                mask = torch.zeros(T, T, device=device).masked_fill(~mask, float("-inf"))
+            else:
+                # is_causal handles standard causal mask internally
+                pass
+
         # ── Token Embedding ───────────────────────────────────────────────
         x = self.tok_emb(input_ids)
         # Scale embeddings
