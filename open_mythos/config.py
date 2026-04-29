@@ -22,6 +22,7 @@ class MythosConfig:
     dim: int = 2048
     max_seq_len: int = 4096
     tie_word_embeddings: bool = True
+    hidden_act: Literal["silu", "gelu"] = "silu"
 
     # ── Structural Depth ─────────────────────────────────────────────────
     prelude_layers: int = 4

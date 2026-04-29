@@ -38,15 +38,16 @@ class RMSNorm(nn.Module):
 class SwiGLU(nn.Module):
     """SwiGLU feed-forward block: SiLU(xW₁) ⊙ xW₃ then W₂."""
 
-    def __init__(self, dim: int, hidden_dim: int, dropout: float = 0.0) -> None:
+    def __init__(self, dim: int, hidden_dim: int, dropout: float = 0.0, hidden_act: str = "silu") -> None:
         super().__init__()
         self.w1 = nn.Linear(dim, hidden_dim, bias=False)
         self.w3 = nn.Linear(dim, hidden_dim, bias=False)
         self.w2 = nn.Linear(hidden_dim, dim, bias=False)
         self.dropout = nn.Dropout(dropout) if dropout > 0 else nn.Identity()
+        self.act_fn = F.silu if hidden_act == "silu" else F.gelu
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.dropout(self.w2(F.silu(self.w1(x)) * self.w3(x)))
+        return self.dropout(self.w2(self.act_fn(self.w1(x)) * self.w3(x)))
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -122,7 +123,7 @@ class TransformerBlock(nn.Module):
         ffn_hidden = int(cfg.dim * 8 / 3)  # standard SwiGLU sizing
         # Round up to nearest multiple of 64 for efficiency
         ffn_hidden = ((ffn_hidden + 63) // 64) * 64
-        self.ffn = SwiGLU(cfg.dim, ffn_hidden, cfg.resid_dropout)
+        self.ffn = SwiGLU(cfg.dim, ffn_hidden, cfg.resid_dropout, cfg.hidden_act)
 
     def forward(
         self,

@@ -80,13 +80,13 @@ class SparseMoEFFN(nn.Module):
 
         # Routed experts — each is a small SwiGLU FFN
         self.experts = nn.ModuleList([
-            SwiGLU(cfg.dim, cfg.expert_dim, cfg.resid_dropout)
+            SwiGLU(cfg.dim, cfg.expert_dim, cfg.resid_dropout, cfg.hidden_act)
             for _ in range(cfg.n_experts)
         ])
 
         # Shared experts — always active, outputs added unconditionally
         self.shared_experts = nn.ModuleList([
-            SwiGLU(cfg.dim, cfg.expert_dim, cfg.resid_dropout)
+            SwiGLU(cfg.dim, cfg.expert_dim, cfg.resid_dropout, cfg.hidden_act)
             for _ in range(cfg.n_shared_experts)
         ])
 
