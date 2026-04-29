@@ -286,6 +286,10 @@ class OpenMythos(nn.Module):
         # ── Output ───────────────────────────────────────────────────────
         x = self.final_norm(x)
         logits = self.lm_head(x)
+        
+        if self.cfg.final_logit_softcapping is not None:
+            logits = logits / self.cfg.final_logit_softcapping
+            logits = torch.tanh(logits) * self.cfg.final_logit_softcapping
 
         return OpenMythosOutput(
             logits=logits,

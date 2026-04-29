@@ -3,7 +3,7 @@ MythosConfig — All architecture hyperparameters for OpenMythos.
 """
 
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import Literal, Optional
 
 
 @dataclass
@@ -60,6 +60,9 @@ class MythosConfig:
 
     # ── MoE Auxiliary Loss ───────────────────────────────────────────────
     moe_aux_loss_weight: float = 0.01
+
+    # ── Logit Softcapping ────────────────────────────────────────────────
+    final_logit_softcapping: Optional[float] = None
 
     def __post_init__(self) -> None:
         assert self.dim % self.n_heads == 0, (
