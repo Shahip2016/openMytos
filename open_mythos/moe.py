@@ -71,6 +71,7 @@ class SparseMoEFFN(nn.Module):
 
     def __init__(self, cfg: MythosConfig) -> None:
         super().__init__()
+        self.cfg = cfg
         self.n_experts = cfg.n_experts
         self.n_shared_experts = cfg.n_shared_experts
         self.top_k = cfg.n_experts_per_tok
@@ -108,17 +109,36 @@ class SparseMoEFFN(nn.Module):
 
         # ── Routed expert computation ────────────────────────────────────
         out = torch.zeros_like(x_flat)
+        capacity = None
+        if self.cfg.expert_capacity_factor is not None and self.training:
+            capacity = int(self.cfg.expert_capacity_factor * (B * T * self.top_k) / self.n_experts)
+
         for i, expert in enumerate(self.experts):
             # Mask of (token, slot) pairs routed to expert i
             expert_mask = (indices == i)  # (N, top_k) bool
             if not expert_mask.any():
                 continue
-            # Get token indices that route to this expert (any slot)
-            token_mask = expert_mask.any(dim=-1)  # (N,) bool
-            expert_input = x_flat[token_mask]  # (n_tokens, D)
-            expert_output = expert(expert_input)  # (n_tokens, D)
+            
             # Weight: sum of weights across slots where this expert was selected
             w = (weights * expert_mask.float()).sum(dim=-1)  # (N,)
+            
+            # Get token indices that route to this expert (any slot)
+            token_mask = expert_mask.any(dim=-1)  # (N,) bool
+            
+            # Capacity limiting
+            if capacity is not None and token_mask.sum().item() > capacity:
+                # Get the indices of tokens routed to this expert
+                routed_indices = token_mask.nonzero().squeeze(-1)
+                # Sort them by router weight
+                routed_weights = w[routed_indices]
+                _, top_idx = torch.topk(routed_weights, capacity)
+                # Keep only the top 'capacity' tokens
+                new_token_mask = torch.zeros_like(token_mask)
+                new_token_mask[routed_indices[top_idx]] = True
+                token_mask = new_token_mask
+
+            expert_input = x_flat[token_mask]  # (n_tokens, D)
+            expert_output = expert(expert_input)  # (n_tokens, D)
             w_selected = w[token_mask].unsqueeze(-1)  # (n_tokens, 1)
             out[token_mask] += expert_output * w_selected
 

@@ -48,6 +48,7 @@ class MythosConfig:
     n_shared_experts: int = 2
     n_experts_per_tok: int = 2
     expert_dim: int = 1024
+    expert_capacity_factor: Optional[float] = None
 
     # ── Recurrent Stability ──────────────────────────────────────────────
     lora_rank: int = 16          # depth-wise LoRA adapter rank
