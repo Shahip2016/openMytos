@@ -170,6 +170,7 @@ class OpenMythos(nn.Module):
         # ── Token Embedding ───────────────────────────────────────────────
         self.tok_emb = nn.Embedding(cfg.vocab_size, cfg.dim)
         self.emb_norm = RMSNorm(cfg.dim, cfg.norm_eps) if cfg.embed_norm else nn.Identity()
+        self.emb_dropout = nn.Dropout(cfg.emb_dropout) if cfg.emb_dropout > 0 else nn.Identity()
 
         # ── Prelude (standard transformer blocks) ─────────────────────────
         self.prelude = nn.ModuleList([
@@ -253,6 +254,7 @@ class OpenMythos(nn.Module):
         # Scale embeddings
         x = x * math.sqrt(self.cfg.dim)
         x = self.emb_norm(x)
+        x = self.emb_dropout(x)
 
         # ── Prelude ──────────────────────────────────────────────────────
         for block in self.prelude:
