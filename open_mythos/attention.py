@@ -74,6 +74,10 @@ class MultiLatentAttention(nn.Module):
         self.wo = nn.Linear(cfg.n_heads * cfg.v_head_dim, cfg.dim, bias=False)
         self.attn_dropout_p = cfg.attn_dropout
         self.resid_dropout = nn.Dropout(cfg.resid_dropout) if cfg.resid_dropout > 0 else nn.Identity()
+        self.cfg = cfg
+        if cfg.qk_norm:
+            self.qk_norm_q = RMSNorm(cfg.qk_head_dim, cfg.norm_eps)
+            self.qk_norm_k = RMSNorm(cfg.qk_head_dim, cfg.norm_eps)
 
     def forward(
         self,
@@ -86,6 +90,8 @@ class MultiLatentAttention(nn.Module):
         # ── Query ────────────────────────────────────────────────────────
         q = self.q_proj(self.q_norm(self.q_compress(x)))
         q = q.view(B, T, self.n_heads, self.qk_head_dim)
+        if self.cfg.qk_norm:
+            q = self.qk_norm_q(q)
         # Split into content (nope) and positional (rope) parts
         q_nope, q_rope = q.split([self.qk_nope_dim, self.qk_rope_dim], dim=-1)
 
@@ -96,6 +102,11 @@ class MultiLatentAttention(nn.Module):
 
         # ── Decoupled RoPE keys ─────────────────────────────────────────
         k_rope = self.k_rope_proj(x).view(B, T, self.n_heads, self.qk_rope_dim)
+
+        k_full = torch.cat([k_nope, k_rope], dim=-1)
+        if self.cfg.qk_norm:
+            k_full = self.qk_norm_k(k_full)
+        k_nope, k_rope = k_full.split([self.qk_nope_dim, self.qk_rope_dim], dim=-1)
 
         # Apply RoPE to the positional portions only
         # Need freqs for qk_rope_dim // 2 complex pairs
@@ -144,6 +155,10 @@ class GroupedQueryAttention(nn.Module):
         self.wo = nn.Linear(cfg.n_heads * self.head_dim, cfg.dim, bias=False)
         self.attn_dropout_p = cfg.attn_dropout
         self.resid_dropout = nn.Dropout(cfg.resid_dropout) if cfg.resid_dropout > 0 else nn.Identity()
+        self.cfg = cfg
+        if cfg.qk_norm:
+            self.qk_norm_q = RMSNorm(self.head_dim, cfg.norm_eps)
+            self.qk_norm_k = RMSNorm(self.head_dim, cfg.norm_eps)
 
     def forward(
         self,
@@ -156,6 +171,10 @@ class GroupedQueryAttention(nn.Module):
         q = self.wq(x).view(B, T, self.n_heads, self.head_dim)
         k = self.wk(x).view(B, T, self.n_kv_heads, self.head_dim)
         v = self.wv(x).view(B, T, self.n_kv_heads, self.head_dim)
+
+        if self.cfg.qk_norm:
+            q = self.qk_norm_q(q)
+            k = self.qk_norm_k(k)
 
         # Apply RoPE
         rope_slice = rope_freqs[:T, :self.head_dim // 2]
