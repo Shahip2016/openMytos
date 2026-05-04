@@ -322,6 +322,8 @@ class OpenMythos(nn.Module):
         top_p: float = 0.9,
         min_p: float = 0.0,
         repetition_penalty: float = 1.0,
+        frequency_penalty: float = 0.0,
+        presence_penalty: float = 0.0,
     ) -> torch.Tensor:
         """Autoregressive token generation.
 
@@ -349,6 +351,13 @@ class OpenMythos(nn.Module):
                 score = torch.gather(logits, 1, input_ids)
                 score = torch.where(score < 0, score * repetition_penalty, score / repetition_penalty)
                 logits.scatter_(1, input_ids, score)
+
+            # ── Frequency & Presence Penalties ───────────────────────────
+            if frequency_penalty != 0.0 or presence_penalty != 0.0:
+                counts = torch.zeros_like(logits, dtype=torch.int32)
+                counts.scatter_add_(1, input_ids, torch.ones_like(input_ids, dtype=torch.int32))
+                presence = (counts > 0).float()
+                logits = logits - frequency_penalty * counts.float() - presence_penalty * presence
 
             # ── Min-p filtering ──────────────────────────────────────────
             if min_p > 0.0:
@@ -394,6 +403,8 @@ class OpenMythos(nn.Module):
         top_p: float = 0.9,
         min_p: float = 0.0,
         repetition_penalty: float = 1.0,
+        frequency_penalty: float = 0.0,
+        presence_penalty: float = 0.0,
     ):
         """Autoregressive token generation yielding tokens sequentially."""
         self.eval()
@@ -406,6 +417,12 @@ class OpenMythos(nn.Module):
                 score = torch.gather(logits, 1, input_ids)
                 score = torch.where(score < 0, score * repetition_penalty, score / repetition_penalty)
                 logits.scatter_(1, input_ids, score)
+
+            if frequency_penalty != 0.0 or presence_penalty != 0.0:
+                counts = torch.zeros_like(logits, dtype=torch.int32)
+                counts.scatter_add_(1, input_ids, torch.ones_like(input_ids, dtype=torch.int32))
+                presence = (counts > 0).float()
+                logits = logits - frequency_penalty * counts.float() - presence_penalty * presence
 
             if min_p > 0.0:
                 probs = F.softmax(logits, dim=-1)
