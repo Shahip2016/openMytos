@@ -29,6 +29,7 @@ class MoERouter(nn.Module):
         self.gate = nn.Linear(cfg.dim, cfg.n_experts, bias=False)
         self.moe_aux_loss_weight = cfg.moe_aux_loss_weight
         self.moe_z_loss_weight = cfg.moe_z_loss_weight
+        self.router_jitter_noise = cfg.router_jitter_noise
 
     def forward(
         self, x: torch.Tensor
@@ -43,6 +44,9 @@ class MoERouter(nn.Module):
             aux_loss: scalar — load-balancing auxiliary loss
         """
         logits = self.gate(x)  # (N, n_experts)
+        if self.training and self.router_jitter_noise > 0.0:
+            noise = torch.empty_like(logits).uniform_(-self.router_jitter_noise, self.router_jitter_noise)
+            logits = logits + noise
         scores = F.softmax(logits, dim=-1)
 
         # Top-k selection
