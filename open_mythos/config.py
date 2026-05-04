@@ -66,6 +66,7 @@ class MythosConfig:
 
     # ── MoE Auxiliary Loss ───────────────────────────────────────────────
     moe_aux_loss_weight: float = 0.01
+    moe_z_loss_weight: float = 0.0
 
     # ── Logit Softcapping ────────────────────────────────────────────────
     final_logit_softcapping: Optional[float] = None

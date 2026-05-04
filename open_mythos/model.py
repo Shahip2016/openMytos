@@ -285,7 +285,6 @@ class OpenMythos(nn.Module):
 
         # Average aux_loss across loop steps
         total_aux_loss = total_aux_loss / self.cfg.max_loop_iters
-        total_aux_loss = total_aux_loss * self.cfg.moe_aux_loss_weight
 
         # ── Coda ─────────────────────────────────────────────────────────
         x = h

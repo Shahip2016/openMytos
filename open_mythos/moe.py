@@ -22,11 +22,13 @@ from open_mythos.layers import SwiGLU
 class MoERouter(nn.Module):
     """Top-k gating router for sparse expert selection."""
 
-    def __init__(self, dim: int, n_experts: int, top_k: int) -> None:
+    def __init__(self, cfg: MythosConfig) -> None:
         super().__init__()
-        self.top_k = top_k
-        self.n_experts = n_experts
-        self.gate = nn.Linear(dim, n_experts, bias=False)
+        self.top_k = cfg.n_experts_per_tok
+        self.n_experts = cfg.n_experts
+        self.gate = nn.Linear(cfg.dim, cfg.n_experts, bias=False)
+        self.moe_aux_loss_weight = cfg.moe_aux_loss_weight
+        self.moe_z_loss_weight = cfg.moe_z_loss_weight
 
     def forward(
         self, x: torch.Tensor
@@ -58,7 +60,12 @@ class MoERouter(nn.Module):
         mask = mask.sum(dim=1)  # (N, E) — could be >1 if same expert picked twice
         f = mask.mean(dim=0)   # (E,) fraction of tokens per expert
         P = scores.mean(dim=0) # (E,) mean probability per expert
-        aux_loss = (self.n_experts * (f * P).sum())
+        aux_loss = self.moe_aux_loss_weight * (self.n_experts * (f * P).sum())
+
+        # ── Z-loss ───────────────────────────────────────────────────────
+        if self.moe_z_loss_weight > 0.0:
+            z_loss = torch.logsumexp(logits, dim=-1).pow(2).mean()
+            aux_loss = aux_loss + self.moe_z_loss_weight * z_loss
 
         return weights, indices, aux_loss
 
@@ -77,7 +84,7 @@ class SparseMoEFFN(nn.Module):
         self.top_k = cfg.n_experts_per_tok
 
         # Router
-        self.router = MoERouter(cfg.dim, cfg.n_experts, cfg.n_experts_per_tok)
+        self.router = MoERouter(cfg)
 
         # Routed experts — each is a small SwiGLU FFN
         self.experts = nn.ModuleList([
