@@ -169,6 +169,7 @@ class OpenMythos(nn.Module):
 
         # ── Token Embedding ───────────────────────────────────────────────
         self.tok_emb = nn.Embedding(cfg.vocab_size, cfg.dim)
+        self.emb_norm = RMSNorm(cfg.dim, cfg.norm_eps) if cfg.embed_norm else nn.Identity()
 
         # ── Prelude (standard transformer blocks) ─────────────────────────
         self.prelude = nn.ModuleList([
@@ -251,6 +252,7 @@ class OpenMythos(nn.Module):
         x = self.tok_emb(input_ids)
         # Scale embeddings
         x = x * math.sqrt(self.cfg.dim)
+        x = self.emb_norm(x)
 
         # ── Prelude ──────────────────────────────────────────────────────
         for block in self.prelude:

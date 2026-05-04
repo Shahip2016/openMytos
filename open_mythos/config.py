@@ -59,6 +59,7 @@ class MythosConfig:
     # ── Regularisation & Norms ───────────────────────────────────────────
     resid_dropout: float = 0.0
     attn_dropout: float = 0.0
+    embed_norm: bool = False
     norm_eps: float = 1e-6
     rope_theta: float = 10_000.0
     rope_scaling_factor: float = 1.0
